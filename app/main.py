@@ -3,7 +3,7 @@ FastAPI Application & Interactive Web Interface for Image Quality Assessment.
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from io import BytesIO
 from PIL import Image
 import torch
@@ -55,17 +55,18 @@ async def predict_quality(file: UploadFile = File(...)):
     contents = await file.read()
     try:
         image = Image.open(BytesIO(contents)).convert("RGB")
-    except Exception:
-        raise HTTPException(status_code=400, detail="Could not parse image file.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not parse image: {str(e)}")
         
-    result = assess_image_quality(
-        pil_image=image,
-        model=state["model"],
-        device=state["device"],
-        threshold=0.40
-    )
-    
-    return result
+    try:
+        result = assess_image_quality(
+            pil_image=image,
+            model=state["model"],
+            device=state["device"]
+        )
+        return result
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -141,6 +142,11 @@ def root_ui():
                     const response = await fetch('/predict', { method: 'POST', body: formData });
                     const data = await response.json();
 
+                    if (data.error) {
+                        alert('Server error: ' + data.error);
+                        return;
+                    }
+
                     // Render Badge
                     const badge = document.getElementById('statusBadge');
                     if (data.is_suitable_for_cv) {
@@ -159,7 +165,7 @@ def root_ui():
                         if (label === 'clean') {
                             barColor = score >= 0.5 ? '#38a169' : '#e53e3e';
                         } else {
-                            barColor = score >= 0.4 ? '#e53e3e' : '#3182ce';
+                            barColor = score >= 0.5 ? '#e53e3e' : (score >= 0.35 ? '#dd6b20' : '#3182ce');
                         }
                         return `
                             <div class="score-bar-container">
