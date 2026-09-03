@@ -1,14 +1,14 @@
-# 🔬 Image Quality Assessment Model
+# Image Quality Assessment Model
 
 A deep learning multi-label quality defect detection system built with **PyTorch (ResNet-18)**, **Transfer Learning**, **FastAPI**, and **Docker**.
 
-Predicts whether an image is suitable for downstream Computer Vision pipelines by scoring 9 defect categories plus a clean baseline.
+Evaluates images prior to ingestion into downstream Computer Vision pipelines by scoring 9 defect categories plus a clean baseline.
 
 ---
 
-## 📌 Detected Quality Defect Categories
+## Defect Categories
 
-| # | Quality Defect | Description |
+| # | Defect Type | Description |
 | :--- | :--- | :--- |
 | 1 | **Blur** | Out-of-focus or unsharp images |
 | 2 | **Darkness** | Low light / underexposed conditions |
@@ -16,14 +16,14 @@ Predicts whether an image is suitable for downstream Computer Vision pipelines b
 | 4 | **Low Resolution** | Pixelated or heavily downscaled images |
 | 5 | **Glare** | Light reflections and bright hotspots |
 | 6 | **Noise** | Camera sensor grain and electronic noise |
-| 7 | **Motion Artifacts** | Directional streak blur from moving camera |
+| 7 | **Motion Artifacts** | Directional streak blur from moving camera/subject |
 | 8 | **Occlusion** | Objects or opaque blocks obstructing view |
 | 9 | **Poor Framing** | Bad composition / cut-off subjects |
-| 10 | **Clean** | High-quality baseline suitable for downstream CV |
+| 10 | **Clean** | High-quality baseline suitable for downstream processing |
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 image-quality-assessment/
@@ -56,9 +56,22 @@ image-quality-assessment/
 
 ---
 
-## 🚀 Step-by-Step Guide: How to Run the Project
+## Benchmarks & Evaluation
 
-### 1. Generate Synthetic Training Data (5,000 Images)
+Trained on 5,000 synthetically distorted images (4,000 train / 1,000 validation split):
+
+* **Validation Accuracy**: **98.74%**
+* **Validation Loss (BCE)**: **0.0468**
+* **Decision Rules**:
+  * Reject if any single defect confidence $\ge 50\%$.
+  * Reject if 2 or more defects confidence $\ge 35\%$.
+  * Pass otherwise.
+
+---
+
+## Execution Guide
+
+### 1. Generate Synthetic Dataset (5,000 Images)
 
 ```powershell
 .\venv\Scripts\python.exe -m training.generate_data
@@ -66,27 +79,24 @@ image-quality-assessment/
 
 ---
 
-### 2. Train the ResNet-18 Model
+### 2. Train the Model
 
 ```powershell
 .\venv\Scripts\python.exe -m training.train
 ```
 
-* Trains for 5 epochs using transfer learning on CPU in ~1–2 minutes.
-* Automatically saves the best model checkpoint to `models/quality_model.pt`.
+* Saves the best checkpoint to `models/quality_model.pt`.
 
 ---
 
-### 3. Launch the Web Application & Live UI
+### 3. Start the Web Service
 
 ```powershell
 .\venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
 ```
 
-Open your browser and navigate to:
-👉 **`http://localhost:8000`**
-
-Upload any image from your computer to see real-time defect diagnosis and CV pipeline suitability decision!
+Access the user interface at:
+`http://localhost:8000`
 
 ---
 

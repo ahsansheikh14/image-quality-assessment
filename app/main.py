@@ -1,5 +1,5 @@
 """
-FastAPI Application & Interactive Web Interface for Image Quality Assessment.
+FastAPI Application & Web Interface for Image Quality Assessment.
 """
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
@@ -15,21 +15,20 @@ from training.dataset import NUM_CLASSES
 
 app = FastAPI(title="Image Quality Assessment Service", version="1.0")
 
-# Global state
 state = {}
 
 
 @app.on_event("startup")
 def startup_event():
-    print("Loading Image Quality Model...")
+    print("Loading image quality model...")
     model_path = "models/quality_model.pt"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     
     if os.path.exists(model_path):
         model = load_trained_model(model_path=model_path, num_classes=NUM_CLASSES, device=device)
-        print("✅ Loaded trained quality model weights.")
+        print("Loaded trained model weights.")
     else:
-        print("⚠️ No trained weights found. Loading baseline model. Run `python -m training.train` to train.")
+        print("No trained weights found. Initializing base model.")
         model = ImageQualityModel(num_classes=NUM_CLASSES, freeze_backbone=True)
         model.to(device)
         model.eval()
@@ -46,7 +45,7 @@ def health_check():
 @app.post("/predict")
 async def predict_quality(file: UploadFile = File(...)):
     """
-    Accepts an uploaded image file and returns full quality defect scores
+    Accepts an uploaded image file and returns quality defect scores
     and downstream Computer Vision suitability decision.
     """
     if not file.content_type.startswith("image/"):
@@ -73,47 +72,49 @@ async def predict_quality(file: UploadFile = File(...)):
 def root_ui():
     return """
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
+        <meta charset="UTF-8">
         <title>Image Quality Assessment Tool</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; margin: 0; padding: 30px 20px; }
-            .container { max-width: 900px; margin: 0 auto; background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
-            h1 { margin-top: 0; color: #1a202c; font-size: 26px; }
-            p.sub { color: #718096; margin-bottom: 25px; }
-            .upload-box { border: 2px dashed #cbd5e0; padding: 30px; text-align: center; border-radius: 8px; cursor: pointer; background: #f8fafc; }
-            .upload-box:hover { border-color: #3182ce; background: #ebf8ff; }
-            .preview-container { display: flex; gap: 30px; margin-top: 30px; flex-wrap: wrap; }
+            body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; margin: 0; padding: 40px 20px; }
+            .container { max-width: 900px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 32px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+            h1 { margin-top: 0; font-size: 22px; font-weight: 700; color: #0f172a; }
+            p.sub { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+            .upload-box { border: 2px dashed #cbd5e1; padding: 36px 20px; text-align: center; border-radius: 6px; cursor: pointer; background: #f8fafc; transition: all 0.2s ease; }
+            .upload-box:hover { border-color: #2563eb; background: #eff6ff; }
+            .preview-container { display: flex; gap: 32px; margin-top: 32px; flex-wrap: wrap; }
             .image-col { flex: 1; min-width: 280px; text-align: center; }
-            .image-col img { max-width: 100%; max-height: 320px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-            .results-col { flex: 1.3; min-width: 300px; }
-            .badge { display: inline-block; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-bottom: 15px; }
-            .badge-pass { background: #c6f6d5; color: #22543d; }
-            .badge-fail { background: #fed7d7; color: #742a2a; }
+            .image-col img { max-width: 100%; max-height: 320px; border-radius: 6px; border: 1px solid #e2e8f0; }
+            .results-col { flex: 1.2; min-width: 300px; }
+            .badge { display: inline-block; padding: 6px 12px; border-radius: 4px; font-weight: 600; font-size: 12px; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 12px; }
+            .badge-pass { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+            .badge-fail { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+            .badge-loading { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
             .score-bar-container { margin-bottom: 12px; }
-            .score-label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #4a5568; margin-bottom: 4px; }
-            .bar-bg { background: #edf2f7; border-radius: 6px; height: 10px; overflow: hidden; }
-            .bar-fill { height: 100%; border-radius: 6px; transition: width 0.4s ease; }
+            .score-label { display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+            .bar-bg { background: #f1f5f9; border-radius: 4px; height: 8px; overflow: hidden; }
+            .bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>🔬 Image Quality Assessment Model</h1>
-            <p class="sub">Detect defects (blur, glare, darkness, overexposure, motion artifacts, occlusion, framing, low resolution) to verify CV pipeline suitability.</p>
+            <h1>Image Quality Assessment</h1>
+            <p class="sub">Automated defect detection pipeline for verifying image suitability prior to downstream Computer Vision processing.</p>
             
             <div class="upload-box" onclick="document.getElementById('fileInput').click()">
                 <input type="file" id="fileInput" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
-                <p style="margin: 0; font-size: 16px; color: #4a5568; font-weight: 500;">📁 Click or drag an image here to test quality</p>
+                <p style="margin: 0; font-size: 14px; color: #334155; font-weight: 500;">Click or drag an image here to evaluate quality metrics</p>
             </div>
 
             <div id="outputSection" class="preview-container" style="display: none;">
                 <div class="image-col">
-                    <img id="imgPreview" src="" alt="Uploaded image">
+                    <img id="imgPreview" src="" alt="Uploaded input">
                 </div>
                 <div class="results-col">
                     <div id="statusBadge"></div>
-                    <p id="recommendationText" style="color: #4a5568; font-size: 14px; margin-bottom: 20px;"></p>
+                    <p id="recommendationText" style="color: #475569; font-size: 13px; line-height: 1.5; margin-bottom: 20px;"></p>
                     <div id="scoreBars"></div>
                 </div>
             </div>
@@ -124,7 +125,6 @@ def root_ui():
                 const file = event.target.files[0];
                 if (!file) return;
 
-                // Preview image
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     document.getElementById('imgPreview').src = e.target.result;
@@ -132,11 +132,10 @@ def root_ui():
                 };
                 reader.readAsDataURL(file);
 
-                // Send to API
                 const formData = new FormData();
                 formData.append('file', file);
 
-                document.getElementById('statusBadge').innerHTML = '<span class="badge" style="background:#e2e8f0; color:#4a5568;">Analyzing image quality...</span>';
+                document.getElementById('statusBadge').innerHTML = '<span class="badge badge-loading">Analyzing image...</span>';
 
                 try {
                     const response = await fetch('/predict', { method: 'POST', body: formData });
@@ -147,25 +146,23 @@ def root_ui():
                         return;
                     }
 
-                    // Render Badge
                     const badge = document.getElementById('statusBadge');
                     if (data.is_suitable_for_cv) {
-                        badge.innerHTML = '<span class="badge badge-pass">✅ PASSED FOR COMPUTER VISION</span>';
+                        badge.innerHTML = '<span class="badge badge-pass">Passed For Pipeline</span>';
                     } else {
-                        badge.innerHTML = '<span class="badge badge-fail">❌ REJECTED (DEFECTS DETECTED)</span>';
+                        badge.innerHTML = '<span class="badge badge-fail">Rejected (Defects Detected)</span>';
                     }
 
                     document.getElementById('recommendationText').innerText = data.recommendation;
 
-                    // Render Bars
                     const barsContainer = document.getElementById('scoreBars');
                     barsContainer.innerHTML = Object.entries(data.quality_scores).map(([label, score]) => {
                         const pct = (score * 100).toFixed(1);
-                        let barColor = '#3182ce';
+                        let barColor = '#2563eb';
                         if (label === 'clean') {
-                            barColor = score >= 0.5 ? '#38a169' : '#e53e3e';
+                            barColor = score >= 0.5 ? '#16a34a' : '#dc2626';
                         } else {
-                            barColor = score >= 0.5 ? '#e53e3e' : (score >= 0.35 ? '#dd6b20' : '#3182ce');
+                            barColor = score >= 0.5 ? '#dc2626' : (score >= 0.35 ? '#ea580c' : '#2563eb');
                         }
                         return `
                             <div class="score-bar-container">
