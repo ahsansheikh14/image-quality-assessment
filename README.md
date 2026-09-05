@@ -23,6 +23,50 @@ Evaluates images prior to ingestion into downstream Computer Vision pipelines by
 
 ---
 
+## Benchmarks & Evaluation
+
+Trained on 5,000 synthetically distorted images (4,000 train / 1,000 validation split):
+
+* **Validation Accuracy**: **98.74%**
+* **Validation Loss (BCE)**: **0.0468**
+* **Inference Latency**: **~140 ms per image on CPU**
+* **Decision Rules**:
+  * Reject if any single defect confidence $\ge 50\%$.
+  * Reject if 2 or more defects confidence $\ge 35\%$.
+  * Pass otherwise.
+
+---
+
+## Automated Testing & Verification Suite
+
+The repository includes an automated test script in `test_quality_pipeline.py`.
+
+### Run Automated Tests:
+
+```powershell
+python test_quality_pipeline.py
+```
+
+### Verified Test Results:
+
+```text
+======================================================================
+TEST & VERIFICATION SUMMARY REPORT
+======================================================================
+Test Case                        | Latency   | Decision   | Result
+----------------------------------------------------------------------
+Clean Source Image               | 273.51 ms | PASSED     | PASS
+Heavily Blurred Image (Defect)   |  99.57 ms | REJECTED   | PASS
+Severely Dark Image (Defect)     |  97.89 ms | REJECTED   | PASS
+Overexposed Image (Defect)       |  95.07 ms | REJECTED   | PASS
+======================================================================
+Average Inference Latency: 141.51 ms per image on CPU
+OVERALL QUALITY PIPELINE STATUS: PASSED
+======================================================================
+```
+
+---
+
 ## Repository Structure
 
 ```
@@ -46,8 +90,9 @@ image-quality-assessment/
 │   └── distorted/       # 5,000 synthetic distorted images + labels.csv
 │
 ├── models/
-│   └── quality_model.pt # Trained model weights checkpoint
+│   └── quality_model.pt # Trained model weights checkpoint (98.74% accuracy)
 │
+├── test_quality_pipeline.py # Automated verification test script
 ├── Dockerfile           # Production container configuration
 ├── .dockerignore        # Build exclusion rules
 ├── requirements.txt     # Python dependencies
@@ -56,25 +101,12 @@ image-quality-assessment/
 
 ---
 
-## Benchmarks & Evaluation
-
-Trained on 5,000 synthetically distorted images (4,000 train / 1,000 validation split):
-
-* **Validation Accuracy**: **98.74%**
-* **Validation Loss (BCE)**: **0.0468**
-* **Decision Rules**:
-  * Reject if any single defect confidence $\ge 50\%$.
-  * Reject if 2 or more defects confidence $\ge 35\%$.
-  * Pass otherwise.
-
----
-
-## Execution Guide
+## Step-by-Step Execution Guide
 
 ### 1. Generate Synthetic Dataset (5,000 Images)
 
 ```powershell
-.\venv\Scripts\python.exe -m training.generate_data
+python -m training.generate_data
 ```
 
 ---
@@ -82,7 +114,7 @@ Trained on 5,000 synthetically distorted images (4,000 train / 1,000 validation 
 ### 2. Train the Model
 
 ```powershell
-.\venv\Scripts\python.exe -m training.train
+python -m training.train
 ```
 
 * Saves the best checkpoint to `models/quality_model.pt`.
@@ -92,7 +124,7 @@ Trained on 5,000 synthetically distorted images (4,000 train / 1,000 validation 
 ### 3. Start the Web Service
 
 ```powershell
-.\venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 Access the user interface at:
